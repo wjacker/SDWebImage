@@ -444,6 +444,14 @@ didReceiveResponse:(NSURLResponse *)response
     }
     
     NSInteger expected = (NSInteger)response.expectedContentLength;
+    
+    if(expected <= 0 && [response isKindOfClass:[NSHTTPURLResponse class]]) {
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *) response;
+        if([httpResponse allHeaderFields] && [[[httpResponse allHeaderFields] allKeys] containsObject:@"Content-Length"]) {
+            expected = [[[httpResponse allHeaderFields] objectForKey:@"Content-Length"] integerValue];
+        }
+    }
+    
     expected = expected > 0 ? expected : 0;
     self.expectedSize = expected;
     self.response = response;
