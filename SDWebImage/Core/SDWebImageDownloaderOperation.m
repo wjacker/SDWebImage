@@ -447,8 +447,9 @@ didReceiveResponse:(NSURLResponse *)response
     
     if(expected <= 0 && [response isKindOfClass:[NSHTTPURLResponse class]]) {
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *) response;
-        if([httpResponse allHeaderFields] && [[[httpResponse allHeaderFields] allKeys] containsObject:@"Content-Length"]) {
-            expected = [[[httpResponse allHeaderFields] objectForKey:@"Content-Length"] integerValue];
+        NSDictionary *headerFields = [[httpResponse allHeaderFields] copy];
+        if([headerFields isKindOfClass:[NSDictionary class]] && [[headerFields allKeys] containsObject:@"Content-Length"]) {
+            expected = [[headerFields objectForKey:@"Content-Length"] integerValue];
         }
     }
     
