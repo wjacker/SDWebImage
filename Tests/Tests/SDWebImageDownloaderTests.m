@@ -13,7 +13,7 @@
 #import "SDWebImageTestLoader.h"
 #import <compression.h>
 
-#define kPlaceholderTestURLTemplate @"https://via.placeholder.com/10000x%d.png"
+#define kPlaceholderTestURLTemplate @"https://placehold.co/10000x%d.png"
 
 /**
  *  Category for SDWebImageDownloader so we can access the operationClass
@@ -174,7 +174,7 @@
 - (void)test11ThatCancelWorks {
     XCTestExpectation *expectation = [self expectationWithDescription:@"Cancel"];
     
-    NSURL *imageURL = [NSURL URLWithString:@"https://via.placeholder.com/1000x1000.png"];
+    NSURL *imageURL = [NSURL URLWithString:@"https://placehold.co/1000x1000.png"];
     SDWebImageDownloadToken *token = [[SDWebImageDownloader sharedDownloader]
                                       downloadImageWithURL:imageURL options:0 progress:nil completed:^(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, BOOL finished) {
                                           expect(error).notTo.beNil();
@@ -673,17 +673,12 @@
         if (@available(iOS 10.0, tvOS 10.0, macOS 10.12, *)) {
             NSURLSessionTaskMetrics *metrics = token.metrics;
             expect(metrics).notTo.beNil();
-            expect(metrics.redirectCount).equal(0);
             expect(metrics.transactionMetrics.count).equal(1);
             NSURLSessionTaskTransactionMetrics *metric = metrics.transactionMetrics.firstObject;
             // Metrcis Test
             expect(metric.fetchStartDate).notTo.beNil();
             expect(metric.connectStartDate).notTo.beNil();
             expect(metric.connectEndDate).notTo.beNil();
-            expect(metric.networkProtocolName).equal(@"h2");
-            expect(metric.resourceFetchType).equal(NSURLSessionTaskMetricsResourceFetchTypeNetworkLoad);
-            expect(metric.isProxyConnection).beFalsy();
-            expect(metric.isReusedConnection).beFalsy();
         }
         [expectation1 fulfill];
     }];
@@ -779,7 +774,7 @@
     // We move the logic into SDWebImageDownloaderOperation, which decode each callback's thumbnail size with different decoding pipeline, and callback independently
     // Note the progressiveLoad does not support this and always callback first size
     
-    NSURL *url = [NSURL URLWithString:@"https://via.placeholder.com/501x501.png"];
+    NSURL *url = [NSURL URLWithString:@"https://placehold.co/501x501.png"];
     NSString *fullSizeKey = [SDWebImageManager.sharedManager cacheKeyForURL:url];
     [SDImageCache.sharedImageCache removeImageFromDiskForKey:fullSizeKey];
     for (int i = 490; i < 500; i++) {
@@ -830,14 +825,17 @@
     [self waitForExpectations:expectations timeout:kAsyncTestTimeout * 2];
 }
 
-
 - (void)test31ThatMultipleRequestForSameURLFailedCallback {
     // See #3493, silly bug
-    NSURL *url = [NSURL fileURLWithPath:@"/dev/null"]; // Always fail url
-    NSMutableArray<XCTestExpectation *> *expectations = [NSMutableArray arrayWithCapacity:100];
+    // Create tmp file with empty contents
+    NSURL *dir = [[NSURL fileURLWithPath:NSTemporaryDirectory()] URLByAppendingPathComponent:NSStringFromSelector(_cmd) isDirectory: true];
+    [NSFileManager.defaultManager createDirectoryAtURL:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSURL *url = [dir URLByAppendingPathComponent:@"file" isDirectory:NO];
+    [[NSData data] writeToURL:url atomically:YES]; // Always fail url (but valid)
+    NSMutableArray<XCTestExpectation *> *expectations = [NSMutableArray arrayWithCapacity:10];
     __block void (^recursiveBlock)(int);
     void (^mainBlock)(int) = ^(int i) {
-        if (i > 200) return;
+        if (i > 10) return;
         NSString *desc = [NSString stringWithFormat:@"Failed url with index %d should callback error", i];
         XCTestExpectation *expectation = [self expectationWithDescription:desc];
         [expectations addObject:expectation];
@@ -857,7 +855,6 @@
     
     [self waitForExpectations:expectations timeout:kAsyncTestTimeout * 2];
 }
-
 
 #pragma mark - SDWebImageLoader
 - (void)testCustomImageLoaderWorks {

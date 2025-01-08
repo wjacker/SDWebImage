@@ -10,8 +10,8 @@
 #import "SDTestCase.h"
 #import "SDInternalMacros.h"
 #import "SDImageFramePool.h"
+#import "SDWebImageTestTransformer.h"
 #import <KVOController/KVOController.h>
-#import <SDWebImageWebPCoder/SDWebImageWebPCoder.h>
 
 static const NSUInteger kTestGIFFrameCount = 5; // local TestImage.gif loop count
 
@@ -65,8 +65,6 @@ static BOOL _isCalled;
 @end
 
 @interface SDAnimatedImageTest : SDTestCase
-
-@property (nonatomic, strong) UIWindow *window;
 
 @end
 
@@ -328,7 +326,7 @@ static BOOL _isCalled;
 - (void)test23AnimatedImageViewCategoryProgressive {
     XCTestExpectation *expectation = [self expectationWithDescription:@"test SDAnimatedImageView view category progressive"];
     SDAnimatedImageView *imageView = [SDAnimatedImageView new];
-    NSURL *testURL = [NSURL URLWithString:kTestGIFURL];
+    NSURL *testURL = [NSURL URLWithString:@"https://media.giphy.com/media/UEsrLdv7ugRTq/giphy.gif"];
     [SDImageCache.sharedImageCache removeImageFromMemoryForKey:testURL.absoluteString];
     [SDImageCache.sharedImageCache removeImageFromDiskForKey:testURL.absoluteString];
     [imageView sd_setImageWithURL:testURL placeholderImage:nil options:SDWebImageProgressiveLoad progress:^(NSInteger receivedSize, NSInteger expectedSize, NSURL * _Nullable targetURL) {
@@ -355,13 +353,19 @@ static BOOL _isCalled;
 - (void)test24AnimatedImageViewCategoryDiskCache {
     XCTestExpectation *expectation = [self expectationWithDescription:@"test SDAnimatedImageView view category disk cache"];
     SDAnimatedImageView *imageView = [SDAnimatedImageView new];
-    NSURL *testURL = [NSURL URLWithString:kTestGIFURL];
-    [SDImageCache.sharedImageCache removeImageFromMemoryForKey:testURL.absoluteString];
+    NSURL *testURL = [NSURL URLWithString:@"https://foobar.non-exists.org/bizbuz.gif"];
+    NSString *testKey = testURL.absoluteString;
+    [SDImageCache.sharedImageCache removeImageFromMemoryForKey:testKey];
+    [SDImageCache.sharedImageCache removeImageFromDiskForKey:testKey];
+    NSData *imageData = [self testGIFData];
+    [SDImageCache.sharedImageCache storeImageDataToDisk:imageData forKey:testKey];
     [imageView sd_setImageWithURL:testURL placeholderImage:nil completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
         expect(error).to.beNil();
         expect(image).notTo.beNil();
         expect(cacheType).equal(SDImageCacheTypeDisk);
         expect([image isKindOfClass:[SDAnimatedImage class]]).beTruthy();
+        [SDImageCache.sharedImageCache removeImageFromMemoryForKey:testKey];
+        [SDImageCache.sharedImageCache removeImageFromDiskForKey:testKey];
         [expectation fulfill];
     }];
     [self waitForExpectationsWithCommonTimeout];
@@ -767,14 +771,10 @@ static BOOL _isCalled;
     [self waitForExpectationsWithTimeout:15 handler:nil];
 }
 
+#if !SD_TV
 - (void)test36AnimatedImageMemoryCost {
     if (@available(iOS 14, tvOS 14, macOS 11, watchOS 7, *)) {
-#if SD_TV
-        /// TV OS does not support ImageIO's webp.
-        [[SDImageCodersManager sharedManager] addCoder:[SDImageWebPCoder sharedCoder]];
-#else
         [[SDImageCodersManager sharedManager] addCoder:[SDImageAWebPCoder sharedCoder]];
-#endif
         UIImage *image = [UIImage sd_imageWithData:[NSData dataWithContentsOfFile:[self testMemotyCostImagePath]]];
         NSUInteger cost = [image sd_memoryCost];
 #if SD_UIKIT
@@ -791,19 +791,59 @@ static BOOL _isCalled;
         [[SDImageCodersManager sharedManager] removeCoder:[SDImageAWebPCoder sharedCoder]];
     }
 }
+#endif
+
+- (void)test37AnimatedImageWithStaticDataBehavior {
+    UIImage *image = [[SDAnimatedImage alloc] initWithData:[self testJPEGData]];
+    // UIImage+Metadata.h
+    expect(image).notTo.beNil();
+    expect(image.sd_isAnimated).beFalsy();
+    expect(image.sd_imageFormat).equal(SDImageFormatJPEG);
+    expect(image.sd_imageFrameCount).equal(1);
+    expect(image.sd_imageLoopCount).equal(0);
+    // SDImageCoderHelper.h
+    UIImage *decodedImage = [SDImageCoderHelper decodedImageWithImage:image policy:SDImageForceDecodePolicyAutomatic];
+    expect(decodedImage).notTo.equal(image);
+    // SDWebImageDefine.h
+    UIImage *scaledImage = SDScaledImageForScaleFactor(2.0, image);
+    expect(scaledImage).notTo.equal(image);
+}
+
+- (void)testAnimationTransformerWorks {
+    XCTestExpectation *expectation = [self expectationWithDescription:@"test SDAnimatedImageView animationTransformer works"];
+    SDAnimatedImageView *imageView = [SDAnimatedImageView new];
+    // Setup transformer, showing which hook all frames into the test image
+    UIImage *testImage = [[UIImage alloc] initWithData:[self testJPEGData]];
+    SDWebImageTestTransformer *transformer = [SDWebImageTestTransformer new];
+    transformer.testImage = testImage;
+    imageView.animationTransformer = transformer;
+    
+#if SD_UIKIT
+    [self.window addSubview:imageView];
+#else
+    [self.window.contentView addSubview:imageView];
+#endif
+    SDAnimatedImage *image = [SDAnimatedImage imageWithData:[self testGIFData]];
+    imageView.image = image;
+#if SD_UIKIT
+    [imageView startAnimating];
+#else
+    imageView.animates = YES;
+#endif
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        // 0.5s is not finished, frame index should not be 0
+        expect(imageView.player.framePool.currentFrameCount).beGreaterThan(0);
+        expect(imageView.currentFrameIndex).beGreaterThan(0);
+        // Test the current frame image is hooked by transformer
+        expect(imageView.currentFrame).equal(testImage);
+        
+        [expectation fulfill];
+    });
+    
+    [self waitForExpectationsWithCommonTimeout];
+}
 
 #pragma mark - Helper
-- (UIWindow *)window {
-    if (!_window) {
-        UIScreen *mainScreen = [UIScreen mainScreen];
-#if SD_UIKIT
-        _window = [[UIWindow alloc] initWithFrame:mainScreen.bounds];
-#else
-        _window = [[NSWindow alloc] initWithContentRect:mainScreen.frame styleMask:0 backing:NSBackingStoreBuffered defer:NO screen:mainScreen];
-#endif
-    }
-    return _window;
-}
 
 - (NSString *)testGIFPath {
     NSBundle *testBundle = [NSBundle bundleForClass:[self class]];

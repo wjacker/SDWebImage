@@ -16,6 +16,8 @@
 
 @interface SDUtilsTests : SDTestCase
 
+@property (nonatomic) NSTimeInterval duration;
+
 @end
 
 @implementation SDUtilsTests
@@ -53,6 +55,8 @@
     expect(displayLink.isRunning).beTruthy();
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         expect(displayLink.isRunning).beTruthy();
+        NSTimeInterval duration = self.duration; // Should be 1, 200ms accuracy
+        expect(duration).beCloseToWithin(1, 0.2);
         [displayLink stop];
     });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -70,8 +74,7 @@
 
 - (void)displayLinkDidRefresh:(SDDisplayLink *)displayLink {
     NSTimeInterval duration = displayLink.duration; // Running value
-    expect(duration).beGreaterThan(0.001); /// 60Hz ~ 120Hz
-    expect(duration).beLessThan(0.02);
+    self.duration += duration;
 }
 
 - (void)testSDFileAttributeHelper {
@@ -110,22 +113,22 @@
     // Main Screen
     SDGraphicsImageRendererFormat *format = SDGraphicsImageRendererFormat.preferredFormat;
 #if SD_UIKIT
+#if SD_VISION
+    CGFloat screenScale = UITraitCollection.currentTraitCollection.displayScale;
+#else
     CGFloat screenScale = [UIScreen mainScreen].scale;
+#endif
 #elif SD_MAC
     CGFloat screenScale = [NSScreen mainScreen].backingScaleFactor;
 #endif
     expect(format.scale).equal(screenScale);
     expect(format.opaque).beFalsy();
-#if SD_UIKIT
     expect(format.preferredRange).equal(SDGraphicsImageRendererFormatRangeAutomatic);
-#elif SD_MAC
-    expect(format.preferredRange).equal(SDGraphicsImageRendererFormatRangeStandard);
-#endif
     CGSize size = CGSizeMake(100, 100);
     SDGraphicsImageRenderer *renderer = [[SDGraphicsImageRenderer alloc] initWithSize:size format:format];
 #if SD_MAC
     // GitHub action's Mac does not connect to a display, so the ImageRenderer color space is wrong :(
-    if (NSProcessInfo.processInfo.environment[@"GITHUB_ACTIONS"]) {
+    if (SDTestCase.isCI) {
         return;
     }
 #endif

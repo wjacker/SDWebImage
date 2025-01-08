@@ -1,3 +1,185 @@
+## [5.20.0 - Animation Transformer with tint color, on Nov 1st, 2024](https://github.com/rs/SDWebImage/releases/tag/5.20.0)
+See [all tickets marked for the 5.20.0 release](https://github.com/SDWebImage/SDWebImage/milestone/139)
+
+### Features
+#### Animation Transformer
+- SDAniamtedImageView now supports to apply transformer (post-processing of frame), with the SDAnimatedImage. #3761
+- You can apply transform like blurs, tint, CIFilters on animation frames.
+- - Detailed behavior: Transform is applied just after the frame been decoded, on the global decode queue.
+- - Detailed behavior: The transformed image replace the original decoded one, and re-use the design of `maxBufferSize` on SDAnimatedImageView
+
+#### Disk Cache
+- Supports LRU eviction on disk cache, change the default expire type to accessDate instead of modificationDate #3759
+- - In previous versions, the disk cache does not actually supports LRU (The NSFileManager read API does not update the `accessDate`), this version fix this issue and change the default behavior to use `accessDate`
+
+#### Tint Color
+- Add blend mode to UIImage+Transform tint color API, default blend mode changed to sourceIn #3749
+- - In previous versions, the blend mode use `sourceAtop` and does not match UIKit's `tintColor` naming. We now use `sourceIn` to match it.
+- - Due to this changes, the `SDWebImageTintTransformer` defaults to use `sourceIn` blend mode as well. You can use transformer to tint SDAnimatedImageView as well
+
+### Fixes
+- Fix sd_imageFormat sometimes returns undefined on static image #3760
+
+## [5.19.7 - 5.19 fix, on Sep 22th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.7)
+See [all tickets marked for the 5.19.7 release](https://github.com/SDWebImage/SDWebImage/milestone/139)
+
+### Fixes
+- Fix the thumbnail decoding on JPEG which contains EXIF orientation, use the new way to workaround JFIF bug #3743
+- Fix the crash when some special urls cause the cache path return nil and crash #3740
+- Fix the issue that some URL which has percent-encoding with \0 will cause nil cache path #3744
+
+## [5.19.6 - Thumbnail performance, on Sep 7th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.6)
+See [all tickets marked for the 5.19.5 release](https://github.com/SDWebImage/SDWebImage/milestone/138)
+
+### Performance
+- Use the better way to detect lazy/non-lazy CGImage. Only do force decoding for lazy image (avoid thumbnail image been decoded twice) #3736
+
+### Fixes
+- Remove the unused code for iOS 10 polyfill #3735
+
+## [5.19.5 - Swift 6 Compatible, on Jul 24th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.5)
+See [all tickets marked for the 5.19.5 release](https://github.com/SDWebImage/SDWebImage/milestone/137)
+
+### Fixes
+- Fix our HEIC coder to encode timed image sequences instead of non-timed image gallery for HEIC encoding #3727
+- - If you have use case to encode static multi-frame HEIC image, use ImageIO directly. SDWebImage currenly always assume multi-frame image to be animated.
+
+### Project
+- Use the new macro from Swift compiler and SDK to mark the UIImage/UIImageView subclass matching what they designed to be #3731
+- - This solve the Xcode 16 Beta issue when trun on Swift 6 mode with strict concurrency.
+
+### Tests
+- Try to re-enable the HEIC encoding test and visionOS xctest #3728
+
+## [5.19.4 - 5.19 Patch, on Jul 1st, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.4)
+See [all tickets marked for the 5.19.4 release](https://github.com/SDWebImage/SDWebImage/milestone/136)
+
+### Fixes
+- Fix the issue that SDAnimatedImage breaks the vector on macOS #3724
+
+## [5.19.3 - 5.19 Patch, on May 30th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.3)
+See [all tickets marked for the 5.19.3 release](https://github.com/SDWebImage/SDWebImage/milestone/135)
+
+### Fixes
+- Fix the detection of SVGImageRep on macOS AppKit #3716
+
+## [5.19.2 - Canonical Binary XCFramework, on Mar 26th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.2)
+See [all tickets marked for the 5.19.2 release](https://github.com/SDWebImage/SDWebImage/milestone/134)
+
+### Fixes
+- Fix some regression when SDAnimatedImage created with static format like JPEG #3708
+- Fix that colorSpaceGetDeviceRGB cache the color space even when active display changed #3712
+
+### Project
+- Added GitHub action to release XCFramework which is self-signed #3711 #3709
+- - This is the canonical release of binary framework. Import [certifacate](https://github.com/SDWebImage/SDWebImage/blob/master/Certificate/SDWebImage%20Signing%20Certificate.cer) and verify the [public key](https://github.com/SDWebImage/SDWebImage/blob/master/Certificate/SDWebImage%20Signing%20Certificate.pem) when you download the binary framework from unknown sources to avoid supply chain attack.
+- - For Carthage user who build its own SDWebImage binary framwork, you must sign yourself.
+- - See more in https://developer.apple.com/documentation/Xcode/verifying-the-origin-of-your-xcframeworks
+- Fix CocoaPods resource bundle when using only `SDWebImage/Core`
+
+## [5.19.1 - 5.9 Patch, on Mar 26th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.1)
+See [all tickets marked for the 5.19.1 release](https://github.com/SDWebImage/SDWebImage/milestone/133)
+
+### Features
+- Allows the transformer to preserve the UIImage metadata like image format #3688
+- Add a protect when NSString passed into sd_setImageWithURL API (which should be NSURL instance) #3686
+
+### Performance
+- Replace NSFileManager.enumeratorAtPath with enumeratorAtURL for performance and RAM saving #3690
+
+### Warnings
+- mark SDWebImageCacheKeyFilter default initializer unavailable & add missing default case of SDCallbackQueue sync/async function #3683
+
+## [5.19 - CocoaPods X VisionOS, on Feb 25th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.19.0)
+See [all tickets marked for the 5.19.0 release](https://github.com/SDWebImage/SDWebImage/milestone/123)
+
+### Project
+- [Part 2]Added the official visionOS support with CocoaPods, include Demo/Tests/CI #3673
+- This need CocoaPods 1.13.0+
+- Next: We'll bump other SDWebImage.org Pods, like `SDWebImageSwiftUI`, `SDWebImageWebPCoder`, `libwebp` on CocoaPods with the visionOS podspec support.
+
+### Features
+- Added SDWebImageWaitTransition to wait for transition finished and then callback completedBlock #3680
+
+### Changes
+- Formally deprecate `sd_cancelCurrentImageLoad` on UIView category, which cause misunderstanding for the same overloaded method in UIImageView category #3654
+
+## [5.18.12 - 5.8 Patch, on Feb 24th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.18.12)
+See [all tickets marked for the 5.18.12 release](https://github.com/SDWebImage/SDWebImage/milestone/132)
+
+### Fixes
+
+- Fix the issue that iOS 17 indexed PNG workaround breaks the 16bit RGBA PNG #3678
+
+## [5.18.11 - 5.8 Patch, on Feb 13th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.18.11)
+See [all tickets marked for the 5.18.11 release](https://github.com/SDWebImage/SDWebImage/milestone/131)
+
+### Fixes
+
+- Add missing break keyword while converting NSData to SDImageFormat #3672 @adamwangxx
+
+## [5.18.10 - 5.8 Patch, on Jan 11th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.18.10)
+See [all tickets marked for the 5.18.10 release](https://github.com/SDWebImage/SDWebImage/milestone/130)
+
+### Warning
+
+- Fix the warning during clang-analyze #3664 #3663
+
+## [5.18.9 - 5.8 Bugfix, on Jan 10th, 2024](https://github.com/rs/SDWebImage/releases/tag/5.18.9)
+See [all tickets marked for the 5.18.9 release](https://github.com/SDWebImage/SDWebImage/milestone/129)
+
+### Fixes
+
+- Fix that PNG indexed color fix does not enable on Release Build configuration #3659 #3658
+- - The fix was introduced in 5.18.5, but accidentally only enabled in Debug configuration :)
+- Fix the behavior that query thumbnail from full size data does not sync back the thumbnail image into memory cache #3657 #3656
+- - The bug was introduced in 5.14.0, please upgrade if you use thumbnail decoding.
+- Temp remove the assert when thumbnail cache key used with thumbnail context , this may be changed later #3661
+
+### Project
+- Using os_log for our all log to replace the NSLog #3660
+
+## [5.18.8 - 5.8 Patch, on Dec 27th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.8)
+See [all tickets marked for the 5.18.8 release](https://github.com/SDWebImage/SDWebImage/milestone/128)
+
+### Fixes
+- Fix the issue when using the sd_cancelCurrentImageLoad on non-stateful view (like UIImageView.image) #3653
+
+## [5.18.7 - CocoaPods Privacy Manifest, on Dec 11th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.7)
+See [all tickets marked for the 5.18.7 release](https://github.com/SDWebImage/SDWebImage/milestone/127)
+
+### Project
+- Added xcprivacy manifest to CocoaPods #3649
+- - Now all the 3 integration supports the privacy manifest. Check README about usage.
+
+## [5.18.6 - ProMotion/Vision Fix, on Dec 5th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.6)
+See [all tickets marked for the 5.18.6 release](https://github.com/SDWebImage/SDWebImage/milestone/126)
+
+### Fixes
+- Use the new solution for CADisplayLink duration calculation and fix 90Hz/120Hz display (iPhone Pro or Vision Pro) #3644 #3579
+
+## [5.18.5 - iOS 17 Workaround, on Nov 16th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.5)
+See [all tickets marked for the 5.18.5 release](https://github.com/SDWebImage/SDWebImage/milestone/125)
+
+### Fixes
+- Introduce the hacky workaround for iOS 17/macOS 14 ImageIO indexed color png decode (Apple's bug) #3634
+- - This will use runtime detection (accurate and safe), and fix the wrong CGImageAlphaInfo when created from PNG using ImageIO decoder. Currently bug exists on iOS 17.0-17.2
+- - Please help to fire radar to Apple, let them fix this problem as soon as possible.
+- Fix the iOS 17 UIKit issue that UIImageView entering the background will reset CALayer's contents, which cause SDAnimatedImageView render issue (out-of-sync) #3636
+- Fix the sd_colorAtPoint/sd_colorsWithRect return wrong value on pre-multiplied CGImage #3637
+- - Previous version this may return the premultiplied color, which is wrong. Should always return the un-premultiplied color.
+
+### Tests
+- [Unit test] Use placehold.co to replace the down site via.placeholder.com #3639
+
+
+## [5.18.4 - 5.18 Fix, on Oct 27th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.4)
+See [all tickets marked for the 5.18.4 release](https://github.com/SDWebImage/SDWebImage/milestone/124)
+
+### Changes
+- SDAnimatedImage now supports static image like JPEG data #3626 #3625
+-  - Previous version the initializer will return nil and has to use UIImage/NSImage instead
+
 ## [5.18.3 - 5.18 Fix, on Oct 10th, 2023](https://github.com/rs/SDWebImage/releases/tag/5.18.3)
 See [all tickets marked for the 5.18.3 release](https://github.com/SDWebImage/SDWebImage/milestone/122)
 

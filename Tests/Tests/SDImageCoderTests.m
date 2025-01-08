@@ -9,7 +9,6 @@
 
 #import "SDTestCase.h"
 #import "UIColor+SDHexString.h"
-#import <SDWebImageWebPCoder/SDWebImageWebPCoder.h>
 
 @interface SDWebImageDecoderTests : SDTestCase
 
@@ -207,10 +206,10 @@
 - (void)test13ThatHEICWorks {
     if (@available(iOS 11, tvOS 11, macOS 10.13, *)) {
         NSURL *heicURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImage" withExtension:@"heic"];
-#if SD_UIKIT
-        BOOL supportsEncoding = YES; // iPhone Simulator after Xcode 9.3 support HEIC encoding
+#if SD_MAC
+        BOOL supportsEncoding = !SDTestCase.isCI; // GitHub Action Mac env currently does not support HEIC encoding
 #else
-        BOOL supportsEncoding = NO; // Travis-CI Mac env currently does not support HEIC encoding
+        BOOL supportsEncoding = YES; // GitHub Action Mac env with simulator, supported from 20240707.1
 #endif
         [self verifyCoder:[SDImageIOCoder sharedCoder]
         withLocalImageURL:heicURL
@@ -222,9 +221,10 @@
 - (void)test14ThatHEIFWorks {
     if (@available(iOS 11, tvOS 11, macOS 10.13, *)) {
         NSURL *heifURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImage" withExtension:@"heif"];
+        BOOL supportsEncoding = NO; // public.heif UTI alwsays return false, use public.heic
         [self verifyCoder:[SDImageIOCoder sharedCoder]
         withLocalImageURL:heifURL
-         supportsEncoding:NO
+         supportsEncoding:supportsEncoding
           isAnimatedImage:NO];
     }
 }
@@ -240,14 +240,10 @@
 
 - (void)test16ThatHEICAnimatedWorks {
     if (@available(iOS 13, tvOS 13, macOS 10.15, *)) {
-        NSURL *heicURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImageAnimated" withExtension:@"heic"];
-#if SD_UIKIT
+        NSURL *heicURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImageAnimated" withExtension:@"heics"];
+        BOOL supportsEncoding = !SDTestCase.isCI; // GitHub Action Mac env currently does not support HEICS animated encoding (but HEIC supported, I don't know why)
+        // See: #3227
         BOOL isAnimatedImage = YES;
-        BOOL supportsEncoding = YES; // iPhone Simulator after Xcode 9.3 support HEIC encoding
-#else
-        BOOL isAnimatedImage = NO; // Travis-CI Mac env does not upgrade to macOS 10.15
-        BOOL supportsEncoding = NO; // Travis-CI Mac env currently does not support HEIC encoding
-#endif
         [self verifyCoder:[SDImageHEICCoder sharedCoder]
         withLocalImageURL:heicURL
          supportsEncoding:supportsEncoding
@@ -267,15 +263,11 @@
         isVectorImage:YES];
 }
 
+#if !SD_TV
 - (void)test18ThatStaticWebPWorks {
     if (@available(iOS 14, tvOS 14, macOS 11, *)) {
         NSURL *staticWebPURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImageStatic" withExtension:@"webp"];
-#if SD_TV
-        /// TV OS does not support ImageIO's webp.
-        [self verifyCoder:[SDImageWebPCoder sharedCoder]
-#else
         [self verifyCoder:[SDImageAWebPCoder sharedCoder]
-#endif
         withLocalImageURL:staticWebPURL
          supportsEncoding:NO // Currently (iOS 14.0) seems no encoding support
            encodingFormat:SDImageFormatWebP
@@ -283,16 +275,13 @@
             isVectorImage:NO];
     }
 }
+#endif
 
+#if !SD_TV
 - (void)test19ThatAnimatedWebPWorks {
     if (@available(iOS 14, tvOS 14, macOS 11, *)) {
         NSURL *staticWebPURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImageAnimated" withExtension:@"webp"];
-#if SD_TV
-        /// TV OS does not support ImageIO's webp.
-        [self verifyCoder:[SDImageWebPCoder sharedCoder]
-#else
         [self verifyCoder:[SDImageAWebPCoder sharedCoder]
-#endif
         withLocalImageURL:staticWebPURL
          supportsEncoding:NO // Currently (iOS 14.0) seems no encoding support
            encodingFormat:SDImageFormatWebP
@@ -300,6 +289,7 @@
             isVectorImage:NO];
     }
 }
+#endif
 
 - (void)test20ThatImageIOAnimatedCoderAbstractClass {
     SDImageIOAnimatedCoder *coder = [[SDImageIOAnimatedCoder alloc] init];
@@ -312,6 +302,14 @@
 }
 
 - (void)test21ThatEmbedThumbnailHEICWorks {
+#if SD_MAC
+    BOOL supportsEncoding = !SDTestCase.isCI; // GitHub Action Mac env currently does not support HEIC encoding
+#else
+    BOOL supportsEncoding = YES; // GitHub Action Mac env with simulator, supported from 20240707.1
+#endif
+    if (!supportsEncoding) {
+        return;
+    }
     if (@available(iOS 11, tvOS 11, macOS 10.13, *)) {
         // The input HEIC does not contains any embed thumbnail
         NSURL *heicURL = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImage" withExtension:@"heic"];
@@ -355,6 +353,10 @@
     CGSize imageSize = image.size;
     expect(imageSize.width).equal(400);
     expect(imageSize.height).equal(263);
+    // `CGImageSourceCreateThumbnailAtIndex` should always produce non-lazy CGImage
+    CGImageRef cgImage = image.CGImage;
+    expect([SDImageCoderHelper CGImageIsLazy:cgImage]).beFalsy();
+    expect(image.sd_isDecoded).beTruthy();
 }
 
 - (void)test23ThatThumbnailEncodeCalculation {
@@ -362,6 +364,10 @@
     NSData *testImageData = [NSData dataWithContentsOfFile:testImagePath];
     UIImage *image = [SDImageIOCoder.sharedCoder decodedImageWithData:testImageData options:nil];
     expect(image.size).equal(CGSizeMake(5250, 3450));
+    // `CGImageSourceCreateImageAtIndex` should always produce lazy CGImage
+    CGImageRef cgImage = image.CGImage;
+    expect([SDImageCoderHelper CGImageIsLazy:cgImage]).beTruthy();
+    expect(image.sd_isDecoded).beFalsy();
     CGSize thumbnailSize = CGSizeMake(4000, 4000); // 3450 < 4000 < 5250
     NSData *encodedData = [SDImageIOCoder.sharedCoder encodedDataWithImage:image format:SDImageFormatJPEG options:@{
             SDImageCoderEncodeMaxPixelSize: @(thumbnailSize)
@@ -541,14 +547,42 @@
 }
 
 - (void)test29ThatJFIFDecodeOrientationShouldNotApplyTwice {
+    // I don't think this is SDWebImage's issue, it's Apple's ImgeIO Bug, but user complain about this: #3594
+    // In W3C standard, JFIF should always be orientation up, and should not contains EXIF orientation
+    // But some bad image editing tool will generate this kind of image :(
     NSURL *url = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestJFIF" withExtension:@"jpg"];
     NSData *data = [NSData dataWithContentsOfURL:url];
     
     UIImage *image = [SDImageIOCoder.sharedCoder decodedImageWithData:data options:nil];
+    expect(image.sd_imageFormat).equal(SDImageFormatJPEG);
 #if SD_UIKIT
     UIImageOrientation orientation = image.imageOrientation;
-    expect(orientation).equal(UIImageOrientationUp);
+    expect(orientation).equal(UIImageOrientationDown);
 #endif
+    
+    UIImage *systemImage = [[UIImage alloc] initWithData:data];
+#if SD_UIKIT
+    orientation = systemImage.imageOrientation;
+    if (@available(iOS 18.0, tvOS 18.0, watchOS 11.0, *)) {
+        // Apple fix/hack this kind of JFIF on iOS 18
+        expect(orientation).equal(UIImageOrientationUp);
+    } else {
+        expect(orientation).equal(UIImageOrientationDown);
+    }
+#endif
+    
+    // Check bitmap color equal, between our usage of ImageIO decoder and Apple system API behavior
+    // So, this means, if Apple has bugs, we have bugs too, it's not our fault :)
+    UIColor *testColor1 = [image sd_colorAtPoint:CGPointMake(1, 1)];
+    UIColor *testColor2 = [systemImage sd_colorAtPoint:CGPointMake(1, 1)];
+    CGFloat r1, g1, b1, a1;
+    CGFloat r2, g2, b2, a2;
+    [testColor1 getRed:&r1 green:&g1 blue:&b1 alpha:&a1];
+    [testColor2 getRed:&r2 green:&g2 blue:&b2 alpha:&a2];
+    expect(r1).beCloseToWithin(r2, 0.01);
+    expect(g1).beCloseToWithin(g2, 0.01);
+    expect(b1).beCloseToWithin(b2, 0.01);
+    expect(a1).beCloseToWithin(a2, 0.01);
     
     // Manual test again for Apple's API
     CGImageSourceRef source = CGImageSourceCreateWithData((__bridge CFDataRef)data, nil);
@@ -556,6 +590,49 @@
     NSUInteger exifOrientation = [properties[(__bridge NSString *)kCGImagePropertyOrientation] unsignedIntegerValue];
     CFRelease(source);
     expect(exifOrientation).equal(kCGImagePropertyOrientationDown);
+}
+
+- (void)test30ThatImageIOPNGPluginBuggyWorkaround {
+    // See: #3634
+    NSURL *url = [[NSBundle bundleForClass:[self class]] URLForResource:@"IndexedPNG" withExtension:@"png"];
+    NSData *data = [NSData dataWithContentsOfURL:url];
+    
+    UIImage *decodedImage = [SDImageIOCoder.sharedCoder decodedImageWithData:data options:nil];
+    UIColor *testColor1 = [decodedImage sd_colorAtPoint:CGPointMake(100, 1)];
+    CGFloat r1, g1, b1, a1;
+    [testColor1 getRed:&r1 green:&g1 blue:&b1 alpha:&a1];
+    expect(r1).beCloseToWithin(0.60, 0.01);
+    expect(g1).beCloseToWithin(0.91, 0.01);
+    expect(b1).beCloseToWithin(0.91, 0.01);
+    expect(a1).beCloseToWithin(0.20, 0.01);
+    
+    // RGBA 16 bits PNG should not workaround
+    url = [[NSBundle bundleForClass:[self class]] URLForResource:@"RGBA16PNG" withExtension:@"png"];
+    data = [NSData dataWithContentsOfURL:url];
+    decodedImage = [SDImageIOCoder.sharedCoder decodedImageWithData:data options:nil];
+    testColor1 = [decodedImage sd_colorAtPoint:CGPointMake(100, 1)];
+    [testColor1 getRed:&r1 green:&g1 blue:&b1 alpha:&a1];
+    expect(r1).beCloseToWithin(0.60, 0.01);
+    expect(g1).beCloseToWithin(0.60, 0.01);
+    expect(b1).beCloseToWithin(0.33, 0.01);
+    expect(a1).beCloseToWithin(0.33, 0.01);
+}
+
+- (void)test31ThatSVGShouldUseNativeImageClass {
+    NSURL *url = [[NSBundle bundleForClass:[self class]] URLForResource:@"TestImage" withExtension:@"svg"];
+    NSData *data = [NSData dataWithContentsOfURL:url];
+    SDAnimatedImage *animatedImage = [SDAnimatedImage imageWithData:data];
+    expect(animatedImage).beNil();
+    UIImage *image = [UIImage sd_imageWithData:data];
+    Class SVGCoderClass = NSClassFromString(@"SDImageSVGCoder");
+    if (SVGCoderClass && [SVGCoderClass sharedCoder]) {
+        expect(image).notTo.beNil();
+        // Vector version
+        expect(image.sd_isVector).beTruthy();
+    } else {
+        // Platform does not support SVG
+        expect(image).beNil();
+    }
 }
 
 #pragma mark - Utils
