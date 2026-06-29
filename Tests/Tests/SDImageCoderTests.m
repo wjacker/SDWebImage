@@ -450,7 +450,18 @@
     
     // Test old API
     UIImage *animatedImage = [SDImageCoderHelper animatedImageWithFrames:frames];
-    NSData *data = [SDImageGIFCoder.sharedCoder encodedDataWithImage:animatedImage format:SDImageFormatGIF options:nil];
+    SDImageFormat format;
+    if (@available(iOS 12.0, tvOS 12.0, macOS 10.14, watchOS 5.0, *)) {
+        format = SDImageFormatPNG;
+    } else {
+        format = SDImageFormatGIF;
+    }
+    NSData *data;
+    if (format == SDImageFormatPNG) {
+        data = [SDImageAPNGCoder.sharedCoder encodedDataWithImage:animatedImage format:format options:nil];;
+    } else {
+        data = [SDImageGIFCoder.sharedCoder encodedDataWithImage:animatedImage format:format options:nil];
+    }
     expect(data).notTo.beNil();
 
 #if SD_MAC
@@ -458,7 +469,7 @@
     SDAnimatedImageRep *rep = (SDAnimatedImageRep *)animatedImage.representations.firstObject;
     expect([rep isKindOfClass:SDAnimatedImageRep.class]);
     expect(rep.animatedImageData).equal(data);
-    expect(rep.animatedImageFormat).equal(SDImageFormatGIF);
+    expect(rep.animatedImageFormat).equal(format);
 #endif
     
     // Test new API
@@ -893,14 +904,16 @@ withLocalImageURL:(NSURL *)imageUrl
 - (NSDictionary *)gainMapFromImageSource:(CGImageSourceRef)source {
     if (@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)) {
         CFDictionaryRef ISOGainMap = CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeISOGainMap);
+        if (ISOGainMap) {
+            return (__bridge_transfer NSDictionary *)ISOGainMap;
+        }
         CFDictionaryRef HDRGainMap = CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeHDRGainMap);
-        NSDictionary *result = ISOGainMap ? (__bridge_transfer NSDictionary *)ISOGainMap : (__bridge_transfer NSDictionary *)HDRGainMap;
-        if (HDRGainMap) CFRelease(HDRGainMap);
-        if (ISOGainMap) CFRelease(ISOGainMap);
-        return result;
-    } else {
+        if (HDRGainMap) {
+            return (__bridge_transfer NSDictionary *)HDRGainMap;
+        }
         return nil;
     }
+    return nil;
 }
 
 #pragma mark - Utils

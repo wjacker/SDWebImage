@@ -31,7 +31,7 @@
     };
     [self.imageView sd_setImageWithURL:self.imageURL
                       placeholderImage:nil
-                               options:SDWebImageFromLoaderOnly | SDWebImageScaleDownLargeImages
+                               options:SDWebImageFromLoaderOnly | SDWebImageScaleDownLargeImages | SDWebImageProgressiveLoad
                                context:context
                               progress:nil
                              completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {

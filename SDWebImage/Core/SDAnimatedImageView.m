@@ -177,6 +177,7 @@
 - (void)setImage:(UIImage *)image
 {
     if (self.image == image) {
+        super.image = image;
         return;
     }
     

@@ -126,7 +126,11 @@
         if (@available(iOS 10.0, *)) {
             NSURLSessionTaskMetrics *metrics = token.metrics;
             if (metrics) {
-                printf("Metrics: %s download in (%f) seconds\n", [imageURL.absoluteString cStringUsingEncoding:NSUTF8StringEncoding], metrics.taskInterval.duration);
+                printf("Metrics: %s download image size: (%d, %d) in (%f) seconds\n", [imageURL.absoluteString cStringUsingEncoding:NSUTF8StringEncoding], (int)image.size.width, (int)image.size.height, metrics.taskInterval.duration);
+            } else {
+                if (cacheType == SDImageCacheTypeDisk) {
+                    printf("Disk: %s cached image size: (%d, %d)\n", [imageURL.absoluteString cStringUsingEncoding:NSUTF8StringEncoding], (int)image.size.width, (int)image.size.height);
+                }
             }
         }
     }];

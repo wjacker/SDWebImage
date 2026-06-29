@@ -1,3 +1,31 @@
+## [5.21.7 - 5.21 Patch on Feb 26th 2026]
+See [all tickets marked for the 5.21.7 release](https://github.com/SDWebImage/SDWebImage/milestone/149)
+
+### Fixes
+- Fix AppKit SDImageCoderHelper does not use APNG instead of GIF for animated image creation #3870 #3871 @ijunfly
+
+## [5.21.6 - 5.21 Patch on Feb 6th 2026]
+See [all tickets marked for the 5.21.6 release](https://github.com/SDWebImage/SDWebImage/milestone/148)
+
+### Fixes
+- Fix the issue that thumbnail decoding will store the fulll image data into thumbnail key, which effect next time query from disk #3866
+
+### Changes
+- Image cache query API for disk type, no longer write back image to memory cache automatically. Call `storeImageToMemory` if you need.
+- Added support to encode APNG instead of GIF, when no animated image format provided #3867
+
+## [5.21.5 - 5.21 Patch on Dec 3rd 2025]
+See [all tickets marked for the 5.21.5 release](https://github.com/SDWebImage/SDWebImage/milestone/147)
+
+### Fixes
+- Try to move the SDWebImageDownloaderOperation dataTask property initialization into synchronized lock to avoid thread-safe issue #3856 #3842
+
+## [5.21.4 - 5.21 Patch on Nov 28th 2025]
+See [all tickets marked for the 5.21.4 release](https://github.com/SDWebImage/SDWebImage/milestone/146)
+
+### Fixes
+- Using @synchronized to always lock the cache/loader operation to ensure thread-safe. Fix crash issue on iOS 26 #3855 #3849
+
 ## [5.21.3 - 5.21 Patch on Sep 9th 2025]
 See [all tickets marked for the 5.21.3 release](https://github.com/SDWebImage/SDWebImage/milestone/145)
 
